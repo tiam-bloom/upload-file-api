@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<script src="https://cdn.jsdelivr.net/npm/spark-md5@3.0.2/spark-md5.min.js"></script>
+
+		<title>文件上传</title>
+		<style>
+			.progress-bar {
+				width: 100%;
+				background-color: #f3f3f3;
+				border: 1px solid #ccc;
+				height: 20px;
+				position: relative;
+			}
+			.progress-bar-inner {
+				height: 100%;
+				background-color: #4caf50;
+				width: 0%;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>文件上传</h1>
+		<input type="file" id="fileInput" />
+		<button id="uploadBtn">上传文件</button>
+		<div class="progress-bar">
+			<div class="progress-bar-inner" id="progressBar"></div>
+		</div>
+		<p id="status"></p>
+
+		<script>
+			document.getElementById('uploadBtn').addEventListener('click', function(e) {
+				e.preventDefault();
+				uploadFile();
+			});
+
+			// 定义切块大小
+			const chunkSize = 2 * 1024 * 1024; // 每块 2MB
+
+			async function uploadFile() {
+				console.log("上传文件开始...");
+
+				const fileInput = document.getElementById("fileInput");
+				const progressBar = document.getElementById("progressBar");
+				const status = document.getElementById("status");
+
+				if (!fileInput.files.length) {
+					alert("请选择一个文件！");
+					return;
+				}
+				const file = fileInput.files[0];
+				status.textContent = `计算MD5中..., 文件大小: ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+				const fileMD5 = await calculateFileMD5(file);
+				const totalChunks = Math.ceil(file.size / chunkSize);
+				let uploadedChunks = 0;
+
+				for (let i = 0; i < totalChunks; i++) {
+					const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+					const formData = new FormData();
+					const data = {
+						file_name: file.name,
+						file_md5: fileMD5,
+						chunk_index: i,
+						chunk_total: totalChunks,
+					};
+					console.log("data:", data);
+					formData.append("json", JSON.stringify(data));
+					formData.append("chunk", chunk);
+					try {
+						const response = await 	fetch("/upload", {
+							method: "POST",
+							body: formData,
+						});
+						
+						if (!response.ok) {
+							const errorText = await response.text();
+							throw new Error(`上传失败 (${response.status}): ${errorText}`);
+						}
+						const result = await response.json();
+						console.log("上传结果:", result);
+						
+						uploadedChunks++;
+						const progressPercent = (uploadedChunks / totalChunks) * 100;
+						progressBar.style.width = progressPercent + "%";
+						status.textContent = `已上传 ${uploadedChunks}/${totalChunks} 块`;
+						
+						if (result.status === "completed") {
+							status.textContent = "文件上传完成！";
+						}
+					} catch (err) {
+						console.error("上传错误:", err);
+						status.textContent = `上传失败: ${err.message}`;
+						return;
+					}
+				}
+				status.textContent = "上传完成！";
+				alert("上传完成！");
+			}
+			// 计算文件 MD5
+			async function calculateFileMD5(file) {
+				return new Promise((resolve, reject) => {
+					const chunkSize = 2 * 1024 * 1024; // 每块 2MB
+					const chunks = Math.ceil(file.size / chunkSize);
+					const spark = new SparkMD5.ArrayBuffer();
+					const fileReader = new FileReader();
+					let currentChunk = 0;
+
+					fileReader.onload = e => {
+						spark.append(e.target.result); // 添加当前分块
+						currentChunk++;
+						if (currentChunk < chunks) {
+							loadNextChunk();
+						} else {
+							resolve(spark.end()); // 所有分块处理完成
+						}
+					};
+
+					fileReader.onerror = () => {
+						reject("文件读取失败");
+					};
+
+					function loadNextChunk() {
+						const start = currentChunk * chunkSize;
+						const end = Math.min(start + chunkSize, file.size);
+						fileReader.readAsArrayBuffer(file.slice(start, end));
+					}
+
+					loadNextChunk(); // 开始读取第一块
+				});
+			}
+		</script>
+	</body>
+</html>
