@@ -15,14 +15,45 @@ SERVER_PORT = "8888"
 UPLOAD_DIR = Path("D:/文件定时上传目录")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # 每日上传时间
-UPLOAD_TIME = "15:00"
+UPLOAD_TIMES = ["10:00", "15:00", "22:00"]
+# todesk 设备号
+TODESK_NO = "1234567890"
 # 日志文件
 logger.add(
     "百灵快传定时上传日志.log", rotation="100 MB", retention="7 days", compression="zip"
 )
 
 
-def compress_folder_to_zip(folder_path, zip_path):
+def compress_file_name(folder_path: Path) -> Path:
+    """
+    定义压缩文件名规则
+    folder_path: 文件夹路径
+    return: 压缩文件路径
+    """
+    # 统计文件数量
+    files = [f for f in folder_path.glob("**/*") if f.is_file()]
+    file_count = len(files)
+    # 统计总文件夹数量(包括子集嵌套的文件夹)
+    dirs = [d for d in folder_path.glob("**/*") if d.is_dir()]
+    dir_count = len(dirs)
+    # 一级文件夹数量(不包括子集嵌套的文件夹)
+    folder1_count = len(list(folder_path.iterdir()))
+    logger.debug(
+        f"一级文件夹数量: {folder1_count}, 总文件数量: {file_count}, 总文件夹数量: {dir_count}"
+    )
+    # TODO: 修改单题数量计算规则
+    num_count = file_count // 5
+    # 修改文件后缀为zip
+    zip_path = folder_path.with_suffix(".zip")
+    # TODO: 修改定义压缩文件名规则
+    # new_name = f"{zip_path.stem}-{TODESK_NO}-{file_count}-{datetime.now().strftime('%Y%m%d-%H%M%S')}{zip_path.suffix}"
+    new_name = f"{TODESK_NO}-{num_count}{zip_path.suffix}"
+    logger.debug(f"新规则压缩文件名: {new_name}")
+    zip_path = zip_path.with_name(new_name)
+    return zip_path
+
+
+def compress_folder_to_zip(folder_path: Path):
     """
     压缩文件夹
     """
@@ -31,13 +62,14 @@ def compress_folder_to_zip(folder_path, zip_path):
     for root, _, files in os.walk(folder_path):
         for file in files:
             file_list.append(os.path.join(root, file))
-
+    zip_path = compress_file_name(folder_path)
     # 使用 tqdm 显示进度
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for file in tqdm(file_list, desc="压缩文件夹", unit="file"):
             # 保留相对路径
             arcname = os.path.relpath(file, folder_path)
             zipf.write(file, arcname=arcname)
+    return zip_path
 
 
 def upload_file(file_path: Path):
@@ -72,10 +104,8 @@ def upload_file_task():
             if file_path.is_file():
                 up_load_path = file_path
             elif file_path.is_dir():
-                up_load_path = file_path.with_suffix(".zip")
-                compress_folder_to_zip(file_path, up_load_path)
-                # PermissionError
-                # file_path.unlink()  # 压缩后删除原文件夹
+                up_load_path = compress_folder_to_zip(file_path)
+                # 压缩后删除原文件夹
                 shutil.rmtree(file_path)
             else:
                 logger.warning(f"非法文件类型不上传: {file_path}")
@@ -95,9 +125,10 @@ if __name__ == "__main__":
     # upload_file_task()   # 测试使用, 直接执行
     scheduler = BlockingScheduler()
     # 立即执行一次
-    scheduler.add_job(upload_file_task, "date", run_date=datetime.now())
-
+    # scheduler.add_job(upload_file_task, "date", run_date=datetime.now())
     # 每天执行, 解析 UPLOAD_TIME 时间
-    hour, minute = UPLOAD_TIME.split(":")
-    scheduler.add_job(upload_file_task, "cron", hour=hour, minute=minute)
+    for time in UPLOAD_TIMES:
+        hour, minute = time.split(":")
+        scheduler.add_job(upload_file_task, "cron", hour=hour, minute=minute)
+    # 启动调度器
     scheduler.start()
