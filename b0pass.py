@@ -13,7 +13,7 @@ from tenacity import *
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = "8888"
 # 要上传的文件路径
-UPLOAD_DIR = Path("D:/文件定时上传目录")
+UPLOAD_DIR = Path("D:/自动收菜/文件定时上传目录")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 # 每日上传时间
 UPLOAD_TIMES = ["10:00", "15:00", "22:00"]
@@ -46,6 +46,8 @@ def compress_file_name(folder_path: Path) -> Path:
     num_count = file_count // 5
     # 修改文件后缀为zip
     zip_path = folder_path.with_suffix(".zip")
+    # zip_path.stem 原文件名(不带后缀)
+    # zip_path.suffix  文件后缀, 如 .zip
     # TODO: 修改定义压缩文件名规则
     # new_name = f"{zip_path.stem}-{TODESK_NO}-{file_count}-{datetime.now().strftime('%Y%m%d-%H%M%S')}{zip_path.suffix}"
     new_name = f"{TODESK_NO}-{zip_path.stem}-{num_count}{zip_path.suffix}"
@@ -137,13 +139,13 @@ def upload_file_task():
 
 # 使用示例
 if __name__ == "__main__":
-    upload_file_task()  # 测试使用, 直接执行
-    # scheduler = BlockingScheduler()
-    # # 立即执行一次
-    # # scheduler.add_job(upload_file_task, "date", run_date=datetime.now())
-    # # 每天执行, 解析 UPLOAD_TIME 时间
-    # for time in UPLOAD_TIMES:
-    #     hour, minute = time.split(":")
-    #     scheduler.add_job(upload_file_task, "cron", hour=hour, minute=minute)
-    # # 启动调度器
-    # scheduler.start()
+    # upload_file_task()  # 测试使用, 直接执行
+    scheduler = BlockingScheduler()
+    # 立即执行一次
+    scheduler.add_job(upload_file_task, "date", run_date=datetime.now())
+    # 每天执行, 解析 UPLOAD_TIME 时间
+    for time in UPLOAD_TIMES:
+        hour, minute = time.split(":")
+        scheduler.add_job(upload_file_task, "cron", hour=hour, minute=minute)
+    # 启动调度器
+    scheduler.start()
