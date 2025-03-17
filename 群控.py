@@ -1,12 +1,12 @@
 
-# python3.8 pip install pywinrm
+# python3.8 pip install pywinrm 
 import winrm
 # 创建远程会话
-remote_computer = "http://192.168.31.134:5985/wsman"  # 目标设备的 WinRM 地址
-username = "Administrator"
+remote_computer = "http://192.168.110.170:5985/wsman"  # 目标设备的 WinRM 地址
+username = "admin"
 password = "123456"
 
-# winrs -r:192.168.31.134:5985 -u:Administrator -p:123456 ipconfig
+# winrs -r:192.168.110.170:5985 -u:admin -p:123456 ipconfig
 
 session = winrm.Session(remote_computer, auth=(username, password),  transport="ntlm")
 # from requests_kerberos import HTTPKerberosAuth

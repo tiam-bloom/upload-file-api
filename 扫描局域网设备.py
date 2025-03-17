@@ -49,7 +49,7 @@ def nmap_scan_network(target_ip):
 
 if __name__ == "__main__":
     # 指定要扫描的网段，例如 "192.168.1.0/24"
-    network = "192.168.31.0/24"
+    network = "192.168.110.0/24"
     print(f"正在扫描网段: {network} ...")
 
     results = nmap_scan_network(network)
